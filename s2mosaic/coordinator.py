@@ -251,6 +251,7 @@ def mosaic(
         debug_cache=debug_cache,
         coverage_mask=coverage_mask,
         percentile_value=percentile_value,
+        mask_output=scene_index_output
     )
     if "visual" in required_bands:
         required_bands = ["Red", "Green", "Blue"]
@@ -259,7 +260,7 @@ def mosaic(
         nodata_value = 0
 
     if output_dir:
-        if scene_index_output:
+        if scene_index_output and scene_index_output:
             export_tif(
                 array=scene_index_mask,
                 profile=profile,
