@@ -28,6 +28,7 @@ def download_bands_pool(
     debug_cache: bool = False,
     max_dl_workers: int = 4,
     percentile_value: float | None = 50.0,
+    mask_output: bool = False,
 ) -> Tuple[np.ndarray, Dict[str, Any]]:
     s2_scene_size = 10980
     possible_pixel_count = coverage_mask.sum()

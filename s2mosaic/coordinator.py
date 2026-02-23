@@ -89,6 +89,7 @@ def mosaic(
     additional_query: Optional[Dict[str, Any]] = None,
     percentile_value: Optional[float] = None,
     ignore_duplicate_items: bool = True,
+    sorted_items_output: bool = False,
 ) -> Union[Tuple[np.ndarray, Dict[str, Any]], Path]:
     """
     Create a Sentinel-2 mosaic for a specified grid and time range.
@@ -225,6 +226,13 @@ def mosaic(
         sorted_items = sort_items(items=items_with_orbits, sort_method=sort_method)
     else:
         sorted_items = sort_function(items=items_with_orbits)
+
+    if sorted_items_output:
+        if output_dir:
+            items_output_path = output_dir / f"sorted_items_{sort_method}_{grid_id}_{start_date.strftime('%Y%m%d')}_{end_date.strftime('%Y%m%d')}.csv"
+        else:
+            items_output_path =  f"sorted_items_{sort_method}_{grid_id}_{start_date.strftime('%Y%m%d')}_{end_date.strftime('%Y%m%d')}.csv"
+        sorted_items.to_csv(items_output_path, index=False)
 
     logger.info(f"Sorted {len(sorted_items)} scenes using {sort_method} method.")
 
