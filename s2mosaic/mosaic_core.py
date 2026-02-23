@@ -29,7 +29,7 @@ def download_bands_pool(
     max_dl_workers: int = 4,
     percentile_value: float | None = 50.0,
     mask_output: bool = False,
-) -> Tuple[np.ndarray, Dict[str, Any]]:
+) -> Union[Tuple[np.ndarray, Dict[str, Any]], Tuple[np.ndarray, Dict[str, Any], np.ndarray]]:
     s2_scene_size = 10980
     possible_pixel_count = coverage_mask.sum()
 
@@ -52,6 +52,9 @@ def download_bands_pool(
         mosaic = np.zeros((band_count, s2_scene_size, s2_scene_size), dtype=np.float32)
 
     good_pixel_tracker = np.zeros((s2_scene_size, s2_scene_size), dtype=np.uint16)
+    # Track scenes will increase memory size
+    if mask_output:
+        scene_index_mask = np.zeros((s2_scene_size, s2_scene_size), dtype=np.uint8)
 
     pbar = tqdm(
         total=len(sorted_scenes),
@@ -71,6 +74,14 @@ def download_bands_pool(
 
         combo_mask = (non_cloud_pixels * valid_pixels).astype(bool)
 
+        if mask_output:
+            # Keep track of where each pixel came from in scene order.
+            # 0 means no valid source scene was found.
+            source_index = min(index + 1, np.iinfo(np.uint8).max)
+            first_source_pixels = combo_mask & (scene_index_mask == 0)
+            scene_index_mask[first_source_pixels] = source_index
+        else:
+            scene_index_mask = None
         # if method is first, only download valid,
         # non cloudy pixels that have not been filled,
         # else download all valid non cloudy pixels
@@ -168,4 +179,7 @@ def download_bands_pool(
     else:
         mosaic = np.clip(mosaic, 0, 65535).astype(np.int16)
 
-    return mosaic, last_profile
+    if mask_output:
+        return mosaic, last_profile, scene_index_mask
+
+    return mosaic, last_profile, scene_index_mask
