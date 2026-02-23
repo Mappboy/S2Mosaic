@@ -40,6 +40,8 @@ def mosaic(
     additional_query: Optional[Dict[str, Any]] = None,
     percentile_value: Optional[float] = None,
     ignore_duplicate_items: bool = True,
+    sorted_items_output: bool = False,
+    scene_index_output: bool = False,
 ) -> Tuple[np.ndarray, Dict[str, Any]]: ...
 
 
@@ -65,6 +67,8 @@ def mosaic(
     additional_query: Optional[Dict[str, Any]] = None,
     percentile_value: Optional[float] = None,
     ignore_duplicate_items: bool = True,
+    sorted_items_output: bool = False,
+    scene_index_output: bool = False,
 ) -> Path: ...
 
 
@@ -90,6 +94,7 @@ def mosaic(
     percentile_value: Optional[float] = None,
     ignore_duplicate_items: bool = True,
     sorted_items_output: bool = False,
+    scene_index_output: bool = False,
 ) -> Union[Tuple[np.ndarray, Dict[str, Any]], Path]:
     """
     Create a Sentinel-2 mosaic for a specified grid and time range.
@@ -236,7 +241,7 @@ def mosaic(
 
     logger.info(f"Sorted {len(sorted_items)} scenes using {sort_method} method.")
 
-    mosaic, profile = download_bands_pool(
+    mosaic, profile, scene_index_mask = download_bands_pool(
         sorted_scenes=sorted_items,
         required_bands=required_bands,
         no_data_threshold=no_data_threshold,
@@ -254,6 +259,14 @@ def mosaic(
         nodata_value = 0
 
     if output_dir:
+        if scene_index_output:
+            export_tif(
+                array=scene_index_mask,
+                profile=profile,
+                export_path=export_path.with_name(export_path.stem + "_scene_index.tif"),
+                required_bands=["scene_index"],
+                nodata_value=0,
+            )
         export_tif(
             array=mosaic,
             profile=profile,
