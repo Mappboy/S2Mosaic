@@ -178,9 +178,23 @@ def export_tif(
     required_bands: List[str],
     nodata_value: Union[int, None] = 0,
 ) -> None:
+    if array.ndim == 2:
+        write_array = array[np.newaxis, ...]
+    elif array.ndim == 3:
+        write_array = array
+    else:
+        raise ValueError(
+            f"Array must be 2D or 3D for GeoTIFF export, got shape {array.shape}"
+        )
+
+    band_count = write_array.shape[0]
     profile.update(
-        count=array.shape[0], dtype=array.dtype, nodata=nodata_value, compress="lzw"
+        count=band_count,
+        dtype=write_array.dtype,
+        nodata=nodata_value,
+        compress="lzw",
     )
+
     with rio.open(export_path, "w", **profile) as dst:
-        dst.write(array)
-        dst.descriptions = required_bands
+        dst.write(write_array)
+        dst.descriptions = required_bands[:band_count]
