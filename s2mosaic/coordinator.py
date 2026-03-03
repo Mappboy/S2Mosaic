@@ -270,7 +270,7 @@ def mosaic(
     else:
         nodata_value = 0
 
-    if output_dir:
+    if output_dir and all([mosaic is not None, profile is not None]):
         if scene_index_output and scene_index_mask is not None:
             export_tif(
                 array=scene_index_mask,

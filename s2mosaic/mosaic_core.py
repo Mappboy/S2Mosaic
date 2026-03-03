@@ -31,7 +31,8 @@ def download_bands_pool(
     percentile_value: float | None = 50.0,
     mask_output: bool = False,
     download_scl: bool = False,
-    scl_prefix_path: str=None
+    scl_prefix_path: str=None,
+    scl_only: bool = False,
 ) -> Union[Tuple[np.ndarray, Dict[str, Any]], Tuple[np.ndarray, Dict[str, Any], np.ndarray]]:
     s2_scene_size = 10980
     possible_pixel_count = coverage_mask.sum()
@@ -108,30 +109,31 @@ def download_bands_pool(
             mosaic_method=mosaic_method,
         )
 
-        with ThreadPoolExecutor(max_workers=max_dl_workers) as executor:
-            bands_and_profiles = list(
-                executor.map(get_band_with_mask_partial, hrefs_and_indexes)
-            )
-
-        bands = []
-
-        for band, profile in bands_and_profiles:
-            bands.append(
-                scipy.ndimage.zoom(
-                    band,
-                    (s2_scene_size / band.shape[0], s2_scene_size / band.shape[1]),
-                    order=0,
+        if not scl_only:
+            with ThreadPoolExecutor(max_workers=max_dl_workers) as executor:
+                bands_and_profiles = list(
+                    executor.map(get_band_with_mask_partial, hrefs_and_indexes)
                 )
-            )
-            last_profile = profile
 
-        scene_data = np.array(bands)
+            bands = []
 
-        if mosaic_method == MOSAIC_PERCENTILE:
-            scene_data = np.where(combo_mask, scene_data, np.nan)
-            all_scene_data.append(scene_data)
-        else:
-            mosaic += scene_data
+            for band, profile in bands_and_profiles:
+                bands.append(
+                    scipy.ndimage.zoom(
+                        band,
+                        (s2_scene_size / band.shape[0], s2_scene_size / band.shape[1]),
+                        order=0,
+                    )
+                )
+                last_profile = profile
+
+            scene_data = np.array(bands)
+
+            if mosaic_method == MOSAIC_PERCENTILE:
+                scene_data = np.where(combo_mask, scene_data, np.nan)
+                all_scene_data.append(scene_data)
+            else:
+                mosaic += scene_data
 
         completed_of_possible = coverage_mask * (good_pixel_tracker != 0)
         no_data_sum = coverage_mask.sum() - completed_of_possible.sum()
@@ -159,7 +161,7 @@ def download_bands_pool(
     pbar.refresh()
     pbar.close()
 
-    if mosaic_method == MOSAIC_PERCENTILE:
+    if mosaic_method == MOSAIC_PERCENTILE and not scl_only:
         if percentile_value is None:
             raise ValueError("Percentile must be provided for percentile mosaic method")
 
@@ -172,7 +174,7 @@ def download_bands_pool(
             percentile_value=float(percentile_value),
         )
 
-    if mosaic_method == MOSAIC_MEAN:
+    if mosaic_method == MOSAIC_MEAN and not scl_only:
         mosaic = np.divide(
             mosaic,
             good_pixel_tracker,
@@ -185,7 +187,7 @@ def download_bands_pool(
     else:
         mosaic = np.clip(mosaic, 0, 65535).astype(np.int16)
 
-    if mask_output:
-        return mosaic, last_profile, scene_index_mask
+    if scl_only:
+        return None, None, None
 
-    return mosaic, last_profile, scene_index_mask
+    return mosaic, last_profile, None
