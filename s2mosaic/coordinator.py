@@ -149,7 +149,7 @@ def mosaic(
         additional_query = {"eo:cloud_cover": {"lt": 100}}
 
     if sort_function:
-        sort_method = "custom"
+        sort_method = "custom" if sort_method is None else sort_method
 
     # If mosaic method is passed as "median",
     # it is converted to "percentile" with a value of 50.0
@@ -175,6 +175,7 @@ def mosaic(
         required_bands=required_bands,
         grid_id=grid_id,
         percentile_value=percentile_value,
+        sort_function=sort_function,
     )
     logger.info("All inputs validated successfully.")
 

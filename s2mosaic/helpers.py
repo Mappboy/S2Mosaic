@@ -2,7 +2,7 @@ import logging
 from datetime import date, datetime
 from importlib import resources
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union, Callable
 
 import geopandas as gpd
 import numpy as np
@@ -91,13 +91,14 @@ def validate_inputs(
     required_bands: List[str],
     grid_id: str,
     percentile_value: Optional[float],
+    sort_function: Union[Callable, None],
 ) -> None:
     if not grid_id.isalnum() or not grid_id.isupper():
         raise ValueError(
             f"""Grid {grid_id} is invalid. It should be in the format '50HMH'. 
             For more info on the S2 grid system visit https://sentiwiki.copernicus.eu/web/s2-products"""
         )
-    if sort_method not in VALID_SORT_METHODS:
+    if sort_method not in VALID_SORT_METHODS and sort_function is None:
         raise ValueError(
             f"Invalid sort method: {sort_method}. Must be one of {VALID_SORT_METHODS}"
         )
@@ -198,3 +199,4 @@ def export_tif(
     with rio.open(export_path, "w", **profile) as dst:
         dst.write(write_array)
         dst.descriptions = required_bands[:band_count]
+
