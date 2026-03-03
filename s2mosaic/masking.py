@@ -26,18 +26,48 @@ def get_masks(
     inference_dtype: str = "bf16",
     debug_cache: Union[Path, None] = None,
     max_dl_workers: int = 4,
+    download_scl: bool = False,
+    scl_filepath_prefix: Union[str, None] = None,
 ) -> Tuple[np.ndarray, np.ndarray]:
     # download RG+NIR bands at 20m resolution for cloud masking
     required_bands = ["B04", "B03", "B8A"]
+    download_bands = required_mask_bands + (["SCL"] if download_scl else [])
     get_band_20m = partial(get_full_band, res=20, debug_cache=debug_cache)
 
-    hrefs = [item.assets[band].href for band in required_bands]
+    hrefs = [item.assets[band].href for band in download_bands]
 
     with ThreadPoolExecutor(max_workers=max_dl_workers) as executor:
         bands_and_profiles = list(executor.map(get_band_20m, hrefs))
 
+
+    # Split out SCL if requested
+    if download_scl:
+        if scl_filepath_prefix is None:
+            raise ValueError("scl_filepath must be provided when download_scl=True")
+        start_date = datetime.fromisoformat(item.properties['datetime'])
+
+        scl_filepath = scl_filepath_prefix + f"{start_date.strftime('%Y%m%d')}_SCL.tif"
+        scl_band, scl_profile = bands_and_profiles[-1]
+        mask_bands_and_profiles = bands_and_profiles[:-1]
+
+        scl_path = Path(scl_filepath)
+        scl_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # Ensure SCL has a band dimension for rasterio.write
+        if scl_band.ndim == 2:
+            scl_band = scl_band[np.newaxis, :, :]
+
+        profile = dict(scl_profile)
+        profile.setdefault("driver", "GTiff")
+        profile["count"] = scl_band.shape[0]
+
+        with rio.open(scl_path.as_posix(), "w", **profile) as dst:
+            dst.write(scl_band)
+    else:
+        mask_bands_and_profiles = bands_and_profiles
+
     # Separate bands and profiles
-    bands, _ = zip(*bands_and_profiles, strict=False)
+    bands, _ = zip(*mask_bands_and_profiles, strict=False)
     ocm_input = np.vstack(bands)
 
     mask = (

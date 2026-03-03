@@ -30,6 +30,8 @@ def download_bands_pool(
     max_dl_workers: int = 4,
     percentile_value: float | None = 50.0,
     mask_output: bool = False,
+    download_scl: bool = False,
+    scl_prefix_path: str=None
 ) -> Union[Tuple[np.ndarray, Dict[str, Any]], Tuple[np.ndarray, Dict[str, Any], np.ndarray]]:
     s2_scene_size = 10980
     possible_pixel_count = coverage_mask.sum()
@@ -71,6 +73,8 @@ def download_bands_pool(
             inference_dtype=ocm_inference_dtype,
             debug_cache=debug_cache,
             max_dl_workers=max_dl_workers,
+            download_scl=download_scl,
+            scl_filepath_prefix=scl_prefix_path
         )
 
         combo_mask = (non_cloud_pixels * valid_pixels).astype(bool)

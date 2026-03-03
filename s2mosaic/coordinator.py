@@ -240,6 +240,13 @@ def mosaic(
             items_output_path =  f"sorted_items_{sort_method}_{grid_id}_{start_date.strftime('%Y%m%d')}_{end_date.strftime('%Y%m%d')}.csv"
         sorted_items.to_csv(items_output_path, index=False)
 
+    scl_output_path_prefix = None
+    if scl_output:
+        if output_dir:
+            scl_output_path_prefix = output_dir / f"{grid_id}_SCL"
+        else:
+            scl_output_path_prefix =  f"{grid_id}_SCL"
+
     logger.info(f"Sorted {len(sorted_items)} scenes using {sort_method} method.")
 
     mosaic, profile, scene_index_mask = download_bands_pool(
@@ -252,7 +259,9 @@ def mosaic(
         debug_cache=debug_cache,
         coverage_mask=coverage_mask,
         percentile_value=percentile_value,
-        mask_output=scene_index_output
+        mask_output=scene_index_output,
+        download_scl=scl_output,
+        scl_prefix_path=scl_output_path_prefix
     )
     if "visual" in required_bands:
         required_bands = ["Red", "Green", "Blue"]
