@@ -1,6 +1,7 @@
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
-from typing import Tuple
+from pathlib import Path
+from typing import Tuple, Union
 
 import numpy as np
 import pystac
@@ -23,7 +24,7 @@ def get_masks(
     item: pystac.Item,
     batch_size: int = 6,
     inference_dtype: str = "bf16",
-    debug_cache: bool = False,
+    debug_cache: Union[Path, None] = None,
     max_dl_workers: int = 4,
 ) -> Tuple[np.ndarray, np.ndarray]:
     # download RG+NIR bands at 20m resolution for cloud masking

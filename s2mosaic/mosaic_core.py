@@ -3,6 +3,7 @@ import multiprocessing
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 from typing import Any, Dict, List, Tuple, Union
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -25,7 +26,7 @@ def download_bands_pool(
     mosaic_method: str = "mean",
     ocm_batch_size: int = 6,
     ocm_inference_dtype: str = "bf16",
-    debug_cache: bool = False,
+    debug_cache: Union[Path, None] = None,
     max_dl_workers: int = 4,
     percentile_value: float | None = 50.0,
     mask_output: bool = False,
@@ -98,7 +99,8 @@ def download_bands_pool(
         get_band_with_mask_partial = partial(
             get_band_with_mask,
             mask=combo_mask,
-            debug_cache=debug_cache,
+            debug_cache_path=debug_cache,
+            debug_cache=False,
             mosaic_method=mosaic_method,
         )
 

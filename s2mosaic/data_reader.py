@@ -1,7 +1,7 @@
 import logging
 import pickle
 from pathlib import Path
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, Tuple, Union
 
 import numpy as np
 import planetary_computer
@@ -51,6 +51,7 @@ def get_band_with_mask(
     mask: np.ndarray,
     attempt: int = 0,
     debug_cache: bool = False,
+    debug_cache_path: Union[Path,None] = None,
     mosaic_method: str = "",
 ) -> Tuple[np.ndarray, Dict[str, Any]]:
     """Download a S2 band in chunks that intersect with the mask"""
@@ -59,14 +60,18 @@ def get_band_with_mask(
     if debug_cache:
         href_parts = href.split("/")
         cache_path = (
-            Path("cache")
+            debug_cache / Path("cache")
             / f"{href_parts[-4]}_{href_parts[-1]}_{index}_{mosaic_method}_10_masked.pkl"
         )
         cache_path.parent.mkdir(exist_ok=True)
         if cache_path.exists():
-            with open(cache_path, "rb") as f:
-                result = pickle.load(f)
-            return result
+            try:
+                with open(cache_path, "rb") as f:
+                    result = pickle.load(f)
+                return result
+            except pickle.PickleError as e:
+                logger.debug(f"Unpickling error removing file {cache_path}")
+                cache_path.unlink(True)
     try:
         singed_href = planetary_computer.sign(href)
         with rio.open(singed_href) as src:
@@ -90,7 +95,7 @@ def get_band_with_mask(
                 href_and_index=href_and_index,
                 mask=mask,
                 attempt=attempt + 1,
-                debug_cache=False,
+                debug_cache=None,
                 mosaic_method=mosaic_method,
             )
         else:
@@ -101,7 +106,7 @@ def get_band_with_mask(
 
 
 def get_full_band(
-    href: str, attempt: int = 0, res: int = 10, debug_cache: bool = False
+    href: str, attempt: int = 0, res: int = 10, debug_cache: Union[Path,None] = None
 ) -> Tuple[np.ndarray, Dict[str, Any]]:
     try:
         singed_href = planetary_computer.sign(href)
@@ -110,14 +115,18 @@ def get_full_band(
         if debug_cache:
             href_parts = href.split("/")
             cache_path = (
-                Path("cache")
+                debug_cache / Path("cache")
                 / f"{href_parts[-4]}_{href_parts[-1]}_{spatial_ratio}_{res}.pkl"
             )
             cache_path.parent.mkdir(exist_ok=True)
             if cache_path.exists():
-                with open(cache_path, "rb") as f:
-                    result = pickle.load(f)
-                return result
+                try:
+                    with open(cache_path, "rb") as f:
+                        result = pickle.load(f)
+                    return result
+                except pickle.PickleError as e:
+                    logger.debug(f"Unpickling error removing file {cache_path}")
+                    cache_path.unlink(True)
 
         if "TCI_10m" in href:
             band_indexes = [1, 2, 3]
@@ -145,7 +154,7 @@ def get_full_band(
             if debug_cache:
                 logger.info("Debug cache is enabled, skipping cache for retry")
             return get_full_band(
-                href=href, attempt=attempt + 1, res=res, debug_cache=False
+                href=href, attempt=attempt + 1, res=res, debug_cache=None
             )
         else:
             logger.error(f"All retry attempts failed for {href}")
