@@ -31,7 +31,7 @@ def get_masks(
 ) -> Tuple[np.ndarray, np.ndarray]:
     # download RG+NIR bands at 20m resolution for cloud masking
     required_bands = ["B04", "B03", "B8A"]
-    download_bands = required_mask_bands + (["SCL"] if download_scl else [])
+    download_bands = required_bands + (["SCL"] if download_scl else [])
     get_band_20m = partial(get_full_band, res=20, debug_cache=debug_cache)
 
     hrefs = [item.assets[band].href for band in download_bands]
