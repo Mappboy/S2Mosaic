@@ -95,7 +95,8 @@ def mosaic(
     ignore_duplicate_items: bool = True,
     sorted_items_output: bool = False,
     scene_index_output: bool = False,
-    scl_output: bool = False
+    scl_output: bool = False,
+    scl_only: bool = False,
 ) -> Union[Tuple[np.ndarray, Dict[str, Any]], Path]:
     """
     Create a Sentinel-2 mosaic for a specified grid and time range.
@@ -152,6 +153,8 @@ def mosaic(
     if sort_function:
         sort_method = "custom" if sort_method is None else sort_method
 
+    if scl_only:
+        scl_output = True
     # If mosaic method is passed as "median",
     # it is converted to "percentile" with a value of 50.0
     if mosaic_method == "median":
@@ -262,7 +265,8 @@ def mosaic(
         percentile_value=percentile_value,
         mask_output=scene_index_output,
         download_scl=scl_output,
-        scl_prefix_path=scl_output_path_prefix
+        scl_prefix_path=scl_output_path_prefix,
+        scl_only=scl_only
     )
     if "visual" in required_bands:
         required_bands = ["Red", "Green", "Blue"]
