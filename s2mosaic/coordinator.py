@@ -95,6 +95,7 @@ def mosaic(
     ignore_duplicate_items: bool = True,
     sorted_items_output: bool = False,
     scene_index_output: bool = False,
+    scl_output: bool = False
 ) -> Union[Tuple[np.ndarray, Dict[str, Any]], Path]:
     """
     Create a Sentinel-2 mosaic for a specified grid and time range.
