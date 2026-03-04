@@ -13,7 +13,12 @@ from .helpers import (
     validate_inputs,
 )
 from .mosaic_core import download_bands_pool
-from .stac_utils import add_item_info, search_for_items, sort_items
+from .stac_utils import (
+    add_item_info,
+    recalculate_top_scl_good_data,
+    search_for_items,
+    sort_items,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +47,10 @@ def mosaic(
     ignore_duplicate_items: bool = True,
     sorted_items_output: bool = False,
     scene_index_output: bool = False,
+    recalc_scl_for_top_n: bool = False,
+    top_n_scl_recalc: int = 10,
+    scl_recalc_deduct_water: bool = False,
+    scl_recalc_land_only: bool = False,
 ) -> Tuple[np.ndarray, Dict[str, Any]]: ...
 
 
@@ -69,6 +78,10 @@ def mosaic(
     ignore_duplicate_items: bool = True,
     sorted_items_output: bool = False,
     scene_index_output: bool = False,
+    recalc_scl_for_top_n: bool = False,
+    top_n_scl_recalc: int = 10,
+    scl_recalc_deduct_water: bool = False,
+    scl_recalc_land_only: bool = False,
 ) -> Path: ...
 
 
@@ -95,6 +108,10 @@ def mosaic(
     ignore_duplicate_items: bool = True,
     sorted_items_output: bool = False,
     scene_index_output: bool = False,
+    recalc_scl_for_top_n: bool = False,
+    top_n_scl_recalc: int = 10,
+    scl_recalc_deduct_water: bool = False,
+    scl_recalc_land_only: bool = False,
     scl_output: bool = False,
     scl_only: bool = False,
 ) -> Union[Tuple[np.ndarray, Dict[str, Any]], Path]:
@@ -237,6 +254,16 @@ def mosaic(
     else:
         sorted_items = sort_function(items=items_with_orbits)
 
+    if recalc_scl_for_top_n:
+        sorted_items = recalculate_top_scl_good_data(
+            sorted_items=sorted_items,
+            top_n=top_n_scl_recalc,
+            deduct_water=scl_recalc_deduct_water,
+            land_only=scl_recalc_land_only,
+        )
+        if not sort_function:
+            sorted_items = sort_items(items=sorted_items, sort_method=sort_method)
+
     if sorted_items_output:
         if output_dir:
             items_output_path = output_dir / f"sorted_items_{sort_method}_{grid_id}_{start_date.strftime('%Y%m%d')}_{end_date.strftime('%Y%m%d')}.csv"
@@ -253,7 +280,7 @@ def mosaic(
 
     logger.info(f"Sorted {len(sorted_items)} scenes using {sort_method} method.")
 
-    mosaic, profile, scene_index_mask = download_bands_pool(
+    mosaic, profile, scene_index_mask, combined_scl_mask, combined_water_mask = download_bands_pool(
         sorted_scenes=sorted_items,
         required_bands=required_bands,
         no_data_threshold=no_data_threshold,
@@ -274,7 +301,7 @@ def mosaic(
     else:
         nodata_value = 0
 
-    if output_dir and all([mosaic is not None, profile is not None]):
+    if output_dir and profile is not None:
         if scene_index_output and scene_index_mask is not None:
             export_tif(
                 array=scene_index_mask,
@@ -283,13 +310,29 @@ def mosaic(
                 required_bands=["scene_index"],
                 nodata_value=0,
             )
-        export_tif(
-            array=mosaic,
-            profile=profile,
-            export_path=export_path,
-            required_bands=required_bands,
-            nodata_value=nodata_value,
-        )
+        if scl_output and combined_scl_mask is not None and combined_water_mask is not None:
+            export_tif(
+                array=combined_scl_mask,
+                profile=profile,
+                export_path=export_path.with_name(export_path.stem + "_scl_mosaic.tif"),
+                required_bands=["SCL"],
+                nodata_value=0,
+            )
+            export_tif(
+                array=combined_water_mask.astype(np.uint8),
+                profile=profile,
+                export_path=export_path.with_name(export_path.stem + "_water_mask.tif"),
+                required_bands=["water_mask"],
+                nodata_value=0,
+            )
+        if mosaic is not None:
+            export_tif(
+                array=mosaic,
+                profile=profile,
+                export_path=export_path,
+                required_bands=required_bands,
+                nodata_value=nodata_value,
+            )
         return export_path
 
     return mosaic, profile

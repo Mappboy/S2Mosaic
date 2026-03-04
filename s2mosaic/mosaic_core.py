@@ -33,7 +33,7 @@ def download_bands_pool(
     download_scl: bool = False,
     scl_prefix_path: str=None,
     scl_only: bool = False,
-) -> Union[Tuple[np.ndarray, Dict[str, Any]], Tuple[np.ndarray, Dict[str, Any], np.ndarray]]:
+) -> Union[Tuple[np.ndarray, Dict[str, Any]], Tuple[np.ndarray, Dict[str, Any], np.ndarray, np.ndarray, np.ndarray]]:
     s2_scene_size = 10980
     possible_pixel_count = coverage_mask.sum()
 
@@ -60,6 +60,9 @@ def download_bands_pool(
     if mask_output:
         scene_index_mask = np.zeros((s2_scene_size, s2_scene_size), dtype=np.uint8)
 
+    combined_scl_mask = np.zeros((s2_scene_size, s2_scene_size), dtype=np.uint8) if download_scl else None
+    combined_water_mask = np.zeros((s2_scene_size, s2_scene_size), dtype=bool) if download_scl else None
+
     pbar = tqdm(
         total=len(sorted_scenes),
         desc=format_progress(0, len(sorted_scenes), 100.0),
@@ -68,17 +71,24 @@ def download_bands_pool(
     )
 
     for index, item in enumerate(sorted_scenes["item"].tolist()):
-        non_cloud_pixels, valid_pixels = get_masks(
+        non_cloud_pixels, valid_pixels, scl_band, _ = get_masks(
             item=item,
             batch_size=ocm_batch_size,
             inference_dtype=ocm_inference_dtype,
             debug_cache=debug_cache,
             max_dl_workers=max_dl_workers,
             download_scl=download_scl,
-            scl_filepath_prefix=scl_prefix_path
+            scl_filepath_prefix=scl_prefix_path,
+            return_scl=download_scl,
         )
 
         combo_mask = (non_cloud_pixels * valid_pixels).astype(bool)
+
+        if download_scl and scl_band is not None:
+            scl_10m = scl_band.repeat(2, axis=0).repeat(2, axis=1)
+            scl_first = combo_mask & (combined_scl_mask == 0)
+            combined_scl_mask[scl_first] = scl_10m[scl_first].astype(np.uint8)
+            combined_water_mask = combined_water_mask | (scl_10m == 6)
 
         if mask_output:
             # Keep track of where each pixel came from in scene order.
@@ -182,12 +192,12 @@ def download_bands_pool(
             where=good_pixel_tracker != 0,
         )
 
+    if scl_only:
+        return None, None, None, combined_scl_mask, combined_water_mask
+
     if "visual" in required_bands:
         mosaic = np.clip(mosaic, 0, 255).astype(np.uint8)
     else:
         mosaic = np.clip(mosaic, 0, 65535).astype(np.int16)
 
-    if scl_only:
-        return None, None, None
-
-    return mosaic, last_profile, None
+    return mosaic, last_profile, scene_index_mask, combined_scl_mask, combined_water_mask

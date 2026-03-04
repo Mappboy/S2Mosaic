@@ -2,10 +2,11 @@ from concurrent.futures import ThreadPoolExecutor
 import datetime
 from functools import partial
 from pathlib import Path
-from typing import Tuple, Union
+from typing import Any, Dict, Optional, Tuple, Union
 
 import numpy as np
 import pystac
+import rasterio as rio
 import scipy
 from omnicloudmask import predict_from_array
 
@@ -29,7 +30,8 @@ def get_masks(
     max_dl_workers: int = 4,
     download_scl: bool = False,
     scl_filepath_prefix: Union[str, None] = None,
-) -> Tuple[np.ndarray, np.ndarray]:
+    return_scl: bool = False,
+) -> Tuple[np.ndarray, np.ndarray, Optional[np.ndarray], Optional[Dict[str, Any]]]:
     # download RG+NIR bands at 20m resolution for cloud masking
     required_bands = ["B04", "B03", "B8A"]
     download_bands = required_bands + (["SCL"] if download_scl else [])
@@ -47,7 +49,7 @@ def get_masks(
             raise ValueError("scl_filepath must be provided when download_scl=True")
         start_date = datetime.fromisoformat(item.properties['datetime'])
 
-        scl_filepath = scl_filepath_prefix + f"{start_date.strftime('%Y%m%d')}_SCL.tif"
+        scl_filepath = Path(scl_filepath_prefix) / f"{start_date.strftime('%Y%m%d')}_SCL.tif"
         scl_band, scl_profile = bands_and_profiles[-1]
         mask_bands_and_profiles = bands_and_profiles[:-1]
 
@@ -66,6 +68,7 @@ def get_masks(
             dst.write(scl_band)
     else:
         mask_bands_and_profiles = bands_and_profiles
+        scl_band, scl_profile = None, None
 
     # Separate bands and profiles
     bands, _ = zip(*mask_bands_and_profiles, strict=False)
@@ -83,4 +86,6 @@ def get_masks(
     mask = mask.repeat(2, axis=0).repeat(2, axis=1)
     valid_mask = get_valid_mask(ocm_input)
     valid_mask = valid_mask.repeat(2, axis=0).repeat(2, axis=1)
-    return mask, valid_mask
+    if return_scl and scl_band is not None:
+        return mask, valid_mask, scl_band.squeeze(), scl_profile
+    return mask, valid_mask, None, None

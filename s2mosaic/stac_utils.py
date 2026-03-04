@@ -1,9 +1,17 @@
 import logging
+import urllib.request
 from datetime import date
+from pathlib import Path
 from typing import Any, Dict, List
 
+import geopandas as gpd
+import numpy as np
 import pandas as pd
+import planetary_computer
 import pystac_client
+import rasterio as rio
+from rasterio import features
+from rasterio.warp import transform_bounds
 import shapely
 from pandas import DataFrame
 from pystac import Item
@@ -15,6 +23,80 @@ from urllib3 import Retry
 from .helpers import SORT_NEWEST, SORT_OLDEST, SORT_VALID_DATA
 
 logger = logging.getLogger(__name__)
+
+
+SCL_CLEAR_CLASSES = {4, 5, 6, 7, 11}
+
+
+def _get_osm_land_polygons(cache_dir: Path) -> Path:
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    zip_path = cache_dir / "land-polygons-split-4326.zip"
+    if not zip_path.exists():
+        urllib.request.urlretrieve(
+            "https://osmdata.openstreetmap.de/download/land-polygons-split-4326.zip",
+            zip_path,
+        )
+    return zip_path
+
+
+def _get_land_mask_for_scene(item: Item, shape: tuple[int, int], cache_dir: Path) -> np.ndarray:
+    signed_href = planetary_computer.sign(item.assets["SCL"].href)
+    with rio.open(signed_href) as src:
+        bbox_wgs84 = transform_bounds(src.crs, "EPSG:4326", *src.bounds)
+        land_zip = _get_osm_land_polygons(cache_dir)
+        land = gpd.read_file(
+            f"zip://{land_zip}!land_polygons.shp",
+            bbox=bbox_wgs84,
+        )
+        if land.empty:
+            return np.zeros(shape, dtype=bool)
+        land = land.to_crs(src.crs)
+        mask = features.rasterize(
+            [(geom, 1) for geom in land.geometry if geom is not None],
+            out_shape=shape,
+            transform=src.transform,
+            fill=0,
+            dtype=np.uint8,
+        )
+    return mask.astype(bool)
+
+
+def recalculate_top_scl_good_data(
+    sorted_items: DataFrame,
+    top_n: int = 10,
+    deduct_water: bool = False,
+    land_only: bool = False,
+) -> DataFrame:
+    if sorted_items.empty:
+        return sorted_items
+
+    updated = sorted_items.copy()
+    top_n = min(top_n, len(updated))
+
+    cache_dir = Path.home() / ".cache" / "s2mosaic"
+    land_mask: np.ndarray | None = None
+
+    for idx in range(top_n):
+        item = updated.iloc[idx]["item"]
+        signed_href = planetary_computer.sign(item.assets["SCL"].href)
+        with rio.open(signed_href) as src:
+            scl = src.read(1)
+
+        clear_classes = SCL_CLEAR_CLASSES - ({6} if deduct_water else set())
+        valid_mask = np.isin(scl, list(SCL_CLEAR_CLASSES | {2, 3, 8, 9, 10}))
+        good_mask = np.isin(scl, list(clear_classes))
+
+        if land_only:
+            if land_mask is None or land_mask.shape != scl.shape:
+                land_mask = _get_land_mask_for_scene(item, scl.shape, cache_dir)
+            valid_mask = valid_mask & land_mask
+            good_mask = good_mask & land_mask
+
+        valid_pixels = valid_mask.sum()
+        good_data_pct = float(good_mask.sum() / valid_pixels * 100) if valid_pixels > 0 else 0.0
+        updated.at[updated.index[idx], "good_data_pct"] = good_data_pct
+
+    return updated
 
 
 def add_item_info(items: ItemCollection) -> DataFrame:
