@@ -57,6 +57,7 @@ def get_band_with_mask(
     """Download a S2 band in chunks that intersect with the mask"""
     href = href_and_index[0]
     index = href_and_index[1]
+    scl_profile = None
     if debug_cache:
         href_parts = href.split("/")
         cache_path = (
@@ -78,12 +79,13 @@ def get_band_with_mask(
             array = read_in_chunks(
                 href=singed_href, index=index, mask=mask, chunk_multiplier=4
             )
+            scl_profile = src.profile.copy()
             result = array, src.profile.copy()
             if debug_cache:
                 with open(cache_path, "wb") as f:
                     pickle.dump(result, f)
 
-            return result
+            return result, scl_profile
 
     except Exception as e:
         logger.error(f"Failed to open {href}: {e}")
@@ -97,7 +99,7 @@ def get_band_with_mask(
                 attempt=attempt + 1,
                 debug_cache=None,
                 mosaic_method=mosaic_method,
-            )
+            ), scl_profile
         else:
             logger.error(f"All retry attempts failed for {href}")
             raise Exception(

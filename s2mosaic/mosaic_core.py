@@ -69,7 +69,7 @@ def download_bands_pool(
         leave=False,
         bar_format="{desc}",
     )
-
+    scl_profile = None
     for index, item in enumerate(sorted_scenes["item"].tolist()):
         non_cloud_pixels, valid_pixels, scl_band, _ = get_masks(
             item=item,
@@ -111,7 +111,7 @@ def download_bands_pool(
             for band, band_index in zip(required_bands, band_indexes, strict=False)
         ]
 
-        get_band_with_mask_partial = partial(
+        get_band_with_mask_partial, scl_profile = partial(
             get_band_with_mask,
             mask=combo_mask,
             debug_cache_path=debug_cache,
@@ -193,7 +193,7 @@ def download_bands_pool(
         )
 
     if scl_only:
-        return None, None, None, combined_scl_mask, combined_water_mask
+        return None, scl_profile, None, combined_scl_mask, combined_water_mask
 
     if "visual" in required_bands:
         mosaic = np.clip(mosaic, 0, 255).astype(np.uint8)
