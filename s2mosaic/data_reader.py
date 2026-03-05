@@ -85,7 +85,7 @@ def get_band_with_mask(
                 with open(cache_path, "wb") as f:
                     pickle.dump(result, f)
 
-            return result, scl_profile
+            return result
 
     except Exception as e:
         logger.error(f"Failed to open {href}: {e}")
@@ -99,7 +99,7 @@ def get_band_with_mask(
                 attempt=attempt + 1,
                 debug_cache=None,
                 mosaic_method=mosaic_method,
-            ), scl_profile
+            )
         else:
             logger.error(f"All retry attempts failed for {href}")
             raise Exception(

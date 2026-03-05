@@ -71,7 +71,7 @@ def download_bands_pool(
     )
     scl_profile = None
     for index, item in enumerate(sorted_scenes["item"].tolist()):
-        non_cloud_pixels, valid_pixels, scl_band, _ = get_masks(
+        non_cloud_pixels, valid_pixels, scl_band, scl_profile = get_masks(
             item=item,
             batch_size=ocm_batch_size,
             inference_dtype=ocm_inference_dtype,
@@ -111,7 +111,7 @@ def download_bands_pool(
             for band, band_index in zip(required_bands, band_indexes, strict=False)
         ]
 
-        get_band_with_mask_partial, scl_profile = partial(
+        get_band_with_mask_partial = partial(
             get_band_with_mask,
             mask=combo_mask,
             debug_cache_path=debug_cache,
