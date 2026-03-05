@@ -85,7 +85,8 @@ def recalculate_top_scl_good_data(
             scl = src.read(1)
         shadow_cloud_set = {2, 3, 8, 9, 10}
         clear_classes = SCL_CLEAR_CLASSES - ({6} if deduct_water else set())
-        clear_classes = clear_classes + ({11} if include_snow else set())
+        if include_snow:
+            clear_classes.add(11)
         valid_mask = np.isin(scl, list(SCL_CLEAR_CLASSES | shadow_cloud_set))
         good_mask = np.isin(scl, list(clear_classes))
 
