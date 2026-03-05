@@ -47,7 +47,7 @@ def get_masks(
     if download_scl:
         if scl_filepath_prefix is None:
             raise ValueError("scl_filepath must be provided when download_scl=True")
-        start_date = datetime.fromisoformat(item.properties['datetime'])
+        start_date = datetime.datetime.fromisoformat(item.properties['datetime'])
 
         scl_filepath = Path(scl_filepath_prefix) / f"{start_date.strftime('%Y%m%d')}_SCL.tif"
         scl_band, scl_profile = bands_and_profiles[-1]

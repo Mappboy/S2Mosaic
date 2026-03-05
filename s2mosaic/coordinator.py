@@ -260,6 +260,7 @@ def mosaic(
             top_n=top_n_scl_recalc,
             deduct_water=scl_recalc_deduct_water,
             land_only=scl_recalc_land_only,
+            cache_dir=debug_cache
         )
         if not sort_function:
             sorted_items = sort_items(items=sorted_items, sort_method=sort_method)

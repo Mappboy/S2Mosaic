@@ -25,7 +25,7 @@ from .helpers import SORT_NEWEST, SORT_OLDEST, SORT_VALID_DATA
 logger = logging.getLogger(__name__)
 
 
-SCL_CLEAR_CLASSES = {4, 5, 6, 7, 11}
+SCL_CLEAR_CLASSES = {4, 5, 6, 7}
 
 
 def _get_osm_land_polygons(cache_dir: Path) -> Path:
@@ -66,14 +66,16 @@ def recalculate_top_scl_good_data(
     top_n: int = 10,
     deduct_water: bool = False,
     land_only: bool = False,
+    include_snow: bool = False,
+    cache_dir=None
 ) -> DataFrame:
     if sorted_items.empty:
         return sorted_items
 
     updated = sorted_items.copy()
     top_n = min(top_n, len(updated))
-
-    cache_dir = Path.home() / ".cache" / "s2mosaic"
+    if not cache_dir:
+        cache_dir = Path.home() / ".cache" / "s2mosaic"
     land_mask: np.ndarray | None = None
 
     for idx in range(top_n):
@@ -81,9 +83,10 @@ def recalculate_top_scl_good_data(
         signed_href = planetary_computer.sign(item.assets["SCL"].href)
         with rio.open(signed_href) as src:
             scl = src.read(1)
-
+        shadow_cloud_set = {2, 3, 8, 9, 10}
         clear_classes = SCL_CLEAR_CLASSES - ({6} if deduct_water else set())
-        valid_mask = np.isin(scl, list(SCL_CLEAR_CLASSES | {2, 3, 8, 9, 10}))
+        clear_classes = clear_classes + ({11} if include_snow else set())
+        valid_mask = np.isin(scl, list(SCL_CLEAR_CLASSES | shadow_cloud_set))
         good_mask = np.isin(scl, list(clear_classes))
 
         if land_only:
