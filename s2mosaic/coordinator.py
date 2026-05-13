@@ -6,6 +6,8 @@ import numpy as np
 
 from .frequent_coverage import get_frequent_coverage
 from .helpers import (
+    SORT_AOI_VALID_DATA,
+    SORT_VALID_DATA,
     define_dates,
     export_tif,
     get_extent_from_grid_id,
@@ -16,6 +18,7 @@ from .mosaic_core import download_bands_pool
 from .stac_utils import (
     add_item_info,
     recalculate_top_scl_good_data,
+    recalculate_top_scl_metrics,
     search_for_items,
     sort_items,
 )
@@ -51,6 +54,7 @@ def mosaic(
     top_n_scl_recalc: int = 10,
     scl_recalc_deduct_water: bool = False,
     scl_recalc_land_only: bool = False,
+    aoi_polygon_layer: Optional[Any] = None,
 ) -> Tuple[np.ndarray, Dict[str, Any]]: ...
 
 
@@ -82,6 +86,7 @@ def mosaic(
     top_n_scl_recalc: int = 10,
     scl_recalc_deduct_water: bool = False,
     scl_recalc_land_only: bool = False,
+    aoi_polygon_layer: Optional[Any] = None,
 ) -> Path: ...
 
 
@@ -114,6 +119,7 @@ def mosaic(
     scl_recalc_land_only: bool = False,
     scl_output: bool = False,
     scl_only: bool = False,
+    aoi_polygon_layer: Optional[Any] = None,
 ) -> Union[Tuple[np.ndarray, Dict[str, Any]], Path]:
     """
     Create a Sentinel-2 mosaic for a specified grid and time range.
@@ -129,7 +135,7 @@ def mosaic(
         start_day (int, optional): The start day of the time range. Defaults to 1.
         output_dir (Optional[Union[Path, str]], optional): Directory to save the output GeoTIFF.
             If None, the mosaic is not saved to disk and is returned instead. Defaults to None.
-        sort_method (str, optional): Method to sort scenes. Options are "valid_data", "oldest", or "newest". Defaults to "valid_data".
+        sort_method (str, optional): Method to sort scenes. Options are "valid_data", "aoi_valid_data", "oldest", or "newest". Defaults to "valid_data".
         sort_function (Callable, optional): Custom sorting function. If provided, overrides sort_method.
         mosaic_method (str, optional): Method to create the mosaic. Options are "mean", "first", "median" or "percentile". Defaults to "mean".
         duration_years (int, optional): Duration in years to add to the start date. Defaults to 0.
@@ -147,6 +153,8 @@ def mosaic(
         percentile_value (Optional[float], optional): If provided, calculates the specified percentile mosaic.
             must be used with `mosaic_method='percentile'`. Defaults to None, can be a value between 0 and 100.
         ignore_duplicate_items (bool, optional): Whether to remove duplicate scenes based on their IDs. Defaults to True.
+        aoi_polygon_layer (optional): GeoPandas-readable polygon layer path or GeoDataFrame
+            used when sort_method is "aoi_valid_data".
 
     Returns:
         Union[Tuple[np.ndarray, Dict[str, Any]], Path]: If output_dir is None, returns a tuple
@@ -197,6 +205,7 @@ def mosaic(
         grid_id=grid_id,
         percentile_value=percentile_value,
         sort_function=sort_function,
+        aoi_polygon_layer=aoi_polygon_layer,
     )
     logger.info("All inputs validated successfully.")
 
@@ -250,17 +259,28 @@ def mosaic(
     items_with_orbits = add_item_info(items)
 
     if not sort_function:
-        sorted_items = sort_items(items=items_with_orbits, sort_method=sort_method)
+        initial_sort_method = (
+            SORT_VALID_DATA if sort_method == SORT_AOI_VALID_DATA else sort_method
+        )
+        sorted_items = sort_items(items=items_with_orbits, sort_method=initial_sort_method)
     else:
         sorted_items = sort_function(items=items_with_orbits)
 
-    if recalc_scl_for_top_n:
+    if sort_method == SORT_AOI_VALID_DATA and not sort_function:
+        sorted_items = recalculate_top_scl_metrics(
+            sorted_items=sorted_items,
+            top_n=top_n_scl_recalc,
+            deduct_water=scl_recalc_deduct_water,
+            calculate_land=True,
+            aoi_polygon_layer=aoi_polygon_layer,
+        )
+        sorted_items = sort_items(items=sorted_items, sort_method=sort_method)
+    elif recalc_scl_for_top_n:
         sorted_items = recalculate_top_scl_good_data(
             sorted_items=sorted_items,
             top_n=top_n_scl_recalc,
             deduct_water=scl_recalc_deduct_water,
             land_only=scl_recalc_land_only,
-            cache_dir=debug_cache
         )
         if not sort_function:
             sorted_items = sort_items(items=sorted_items, sort_method=sort_method)

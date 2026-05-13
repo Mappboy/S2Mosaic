@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 SORT_VALID_DATA = "valid_data"
+SORT_AOI_VALID_DATA = "aoi_valid_data"
 SORT_OLDEST = "oldest"
 SORT_NEWEST = "newest"
 SORT_CUSTOM = "custom"
@@ -21,7 +22,13 @@ MOSAIC_MEAN = "mean"
 MOSAIC_FIRST = "first"
 MOSAIC_PERCENTILE = "percentile"
 
-VALID_SORT_METHODS = {SORT_VALID_DATA, SORT_OLDEST, SORT_NEWEST, SORT_CUSTOM}
+VALID_SORT_METHODS = {
+    SORT_VALID_DATA,
+    SORT_AOI_VALID_DATA,
+    SORT_OLDEST,
+    SORT_NEWEST,
+    SORT_CUSTOM,
+}
 VALID_MOSAIC_METHODS = {MOSAIC_MEAN, MOSAIC_FIRST, MOSAIC_PERCENTILE}
 
 
@@ -92,6 +99,7 @@ def validate_inputs(
     grid_id: str,
     percentile_value: Optional[float],
     sort_function: Union[Callable, None],
+    aoi_polygon_layer: Any = None,
 ) -> None:
     if not grid_id.isalnum() or not grid_id.isupper():
         raise ValueError(
@@ -101,6 +109,14 @@ def validate_inputs(
     if sort_method not in VALID_SORT_METHODS and sort_function is None:
         raise ValueError(
             f"Invalid sort method: {sort_method}. Must be one of {VALID_SORT_METHODS}"
+        )
+    if (
+        sort_method == SORT_AOI_VALID_DATA
+        and sort_function is None
+        and aoi_polygon_layer is None
+    ):
+        raise ValueError(
+            "aoi_polygon_layer must be provided when sort_method='aoi_valid_data'"
         )
     if mosaic_method not in VALID_MOSAIC_METHODS:
         raise ValueError(
