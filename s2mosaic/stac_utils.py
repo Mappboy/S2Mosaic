@@ -87,7 +87,7 @@ def _load_aoi_polygon_layer(aoi_polygon_layer: Any) -> gpd.GeoDataFrame:
         raise ValueError("aoi_polygon_layer must have a CRS")
 
     aoi = aoi[aoi.geometry.notna()]
-    return aoi[~aoi.geometry.is_empty]
+    return aoi[(~aoi.geometry.is_empty) & aoi.geometry.is_valid]
 
 
 def _rasterize_geometries(
@@ -96,7 +96,9 @@ def _rasterize_geometries(
     transform: Any,
 ) -> np.ndarray:
     valid_geometries = [
-        geom for geom in geometries if geom is not None and not geom.is_empty
+        geom
+        for geom in geometries
+        if geom is not None and not geom.is_empty and geom.is_valid
     ]
     if not valid_geometries:
         return np.zeros(shape, dtype=bool)
