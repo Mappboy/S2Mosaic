@@ -1,5 +1,7 @@
 ## S2Mosaic 🛰️🌍
 
+__NOTE: This is a fork of DPIRD-DMA/S2Mosaic with additional scene sorting, SCL, and AOI functionality implemented.__
+
 S2Mosaic is a Python package for creating cloud-free mosaics from Sentinel-2 satellite imagery. It allows users to generate composite images for specified grid areas and time ranges, with various options for scene selection and mosaic creation.
 
 [S2Mosaic blog post here](https://dpird-dma.github.io/blog/S2Mosaic-Creating-Cloud-Free-Sentinel-2-Mosaics/)
@@ -8,13 +10,25 @@ S2Mosaic is a Python package for creating cloud-free mosaics from Sentinel-2 sat
 ## Features 🌟
 
 - Create Sentinel-2 mosaics for specific grid areas and time ranges.
-- Flexible scene selection methods: by valid data percentage, oldest, or newest scenes.
+- Flexible scene selection methods: by valid data percentage, AOI valid data percentage, oldest, newest, or a custom sorting function.
 - Multiple mosaic creation methods: mean, arbitrary percentile, median or first valid pixel.
 - Support for different spectral bands, including visual (RGB) composites.
 - State-of-the-art cloud masking using the OmniCloudMask library.
-- Export mosaics as GeoTIFF files or return as NumPy arrays.
+- Export mosaics, scene index masks, SCL mosaics, and water masks as GeoTIFF files, or return the mosaic as a NumPy array.
+
+## Additional Features
+- SCL-based re-ranking for the top scenes from `valid_data`, with optional water deduction and land-only scoring.
+- AOI scene ranking with `sort_method="aoi_valid_data"` and `aoi_polygon_layer` to prioritise scenes with clear pixels inside the target polygon.
+- Land-aware AOI ranking that falls back to land valid data and then original `good_data_pct` when AOI scores are tied or unavailable.
+- Custom sorting through `sort_function`, including workflows that manually order scenes around reference dates.
+- Optional sorted scene CSV output for auditing scene selection.
+- Optional scene index, SCL mosaic, and water mask outputs for QA and downstream analysis.
+- Duplicate Sentinel-2 processing baselines are filtered by default so repeated acquisitions keep the latest baseline.
+- SCL recalculation helpers can optionally include snow as clear data for vegetation-oriented workflows.
 
 ## Changelog 📝
+### Version 1.2.11:
+    * Added AOI-aware SCL re-ranking, land/water-aware SCL metrics, optional QA outputs, duplicate baseline filtering, and SCL-only output support.
 ### Version 0.1.9:
     * Added a slight dilation to the no data mask to remove diagonal no data pixels from scene edges.
 ### version 1.0.0
@@ -101,13 +115,24 @@ Similar to the example above but with 16-bit red, green, blue, and NIR bands ret
 
 S2Mosaic provides several options for customizing the mosaic creation process:
 
-- `sort_method`: Choose between "valid_data", "oldest", or "newest" to determine scene selection priority.
-- `mosaic_method`: Use "mean" for an average of valid pixels, "percentile" with "percentile_value" for more particular merging, or "first" to use the first valid pixel.
+- `sort_method`: Choose between "valid_data", "aoi_valid_data", "oldest", "newest", or "custom" to determine scene selection priority.
+- `sort_function`: Provide a callable that receives the scene DataFrame and returns it in the desired order. If provided, it overrides `sort_method`.
+- `mosaic_method`: Use "mean" for an average of valid pixels, "median", "percentile" with "percentile_value" for more particular merging, or "first" to use the first valid pixel.
 - `required_bands`: Specify which spectral bands to include in the mosaic. Use ["visual"] for an RGB composite.
 - `no_data_threshold`: Set the threshold for considering a pixel as no-data. Set to None to process all scenes.
-- `ocm_batch_size`: Set the batch size for OmniCloudMask inference (default: 6).
+- `ocm_batch_size`: Set the batch size for OmniCloudMask inference (default: 1).
 - `ocm_inference_dtype`: Set the data type for OmniCloudMask inference (default: "bf16").
 - `additional_query`: Set additional query filters such as {"eo:cloud_cover": {"lt": 80}}
+- `ignore_duplicate_items`: Remove duplicate acquisitions and keep the latest Sentinel-2 processing baseline (default: True).
+- `recalc_scl_for_top_n`: Recalculate `good_data_pct` for the top candidate scenes from their SCL pixels before mosaicking.
+- `top_n_scl_recalc`: Set how many sorted scenes should receive SCL-based metric recalculation.
+- `scl_recalc_deduct_water`: Treat SCL water pixels as not-clear during SCL metric recalculation.
+- `scl_recalc_land_only`: Recalculate valid data over land only when using SCL re-ranking.
+- `aoi_polygon_layer`: Provide a GeoPandas-readable polygon path or GeoDataFrame for `sort_method="aoi_valid_data"`.
+- `sorted_items_output`: Write the final sorted scene table to CSV.
+- `scene_index_output`: Export a raster showing which sorted scene supplied each output pixel.
+- `scl_output`: Export the combined SCL mosaic and water mask alongside the mosaic.
+- `scl_only`: Build only the SCL-derived outputs without exporting a spectral mosaic.
 
 For more detailed information on these options and additional functionality, please refer to the function docstring in the source code.
 
